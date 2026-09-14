@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package proto.app;
+
+option go_package = "github.com/kirillshkro/hackernews-cli/internal/proto";
+
+// Импорт стандартных сообщений Protobuf
+import "google/protobuf/timestamp.proto";
+
+// MessageType определяет тип сообщения в очереди/брокере
+enum MessageType {
+    MESSAGE_TYPE_UNSPECIFIED = 0;
+    MESSAGE_TYPE_NEW_ITEM = 1;
+    MESSAGE_TYPE_UPDATED_ITEM = 2;
+    MESSAGE_TYPE_DELETED_ITEM = 3;
+    MESSAGE_TYPE_SYNC_REQUEST = 4;
+    MESSAGE_TYPE_SYNC_RESPONSE = 5;
+}
+
+// Item представляет сущность из Hacker News (статья, комментарий, вакансия, опрос)
+message Item {
+    int64 id = 1;
+    bool deleted = 2;
+    string type = 3; // "story", "comment", "job", "poll", "pollopt"
+    string by_user = 4;
+    google.protobuf.Timestamp created_at = 5;
+    string text = 6;
+    bool dead = 7;
+    int64 parent_id = 8;
+    int64 poll_id = 9;
+    string url = 10;
+    int32 score = 11;
+    string title = 12;
+    int32 descendants = 13;
+    google.protobuf.Timestamp updated_at = 14;
+}
+
+// SyncRequest - запрос на синхронизацию данных с Firebase API
+message SyncRequest {
+    string sync_type = 1; // "topstories", "newstories"
+    int64 request_id = 2;
+    int64 timestamp = 3;
+}
+
+// SyncResponse - ответ о результате синхронизации
+message SyncResponse {
+    bool success = 1;
+    string error_message = 2;
+    int32 items_synced = 3;
+    int64 duration_ms = 4;
+    int64 request_id = 5;
+}
+
+// ItemListRequest - запрос списка статей (для внутреннего API)
+message ItemListRequest {
+    string type = 1; // "top" или "new"
+    int32 page = 2;
+    int32 limit = 3;
+}
+
+// ItemListResponse - ответ со списком статей
+message ItemListResponse {
+    repeated Item items = 1;
+    int32 total_count = 2;
+    int32 page = 3;
+    int32 limit = 4;
+    bool has_more = 5;
+}
+
+// CommentTreeRequest - запрос дерева комментариев
+message CommentTreeRequest {
+    int64 parent_id = 1;
+    int32 max_depth = 2;
+    bool include_text = 3;
+}
+
+// CommentTreeResponse - ответ с деревом комментариев
+message CommentTreeResponse {
+    Item root = 1;
+    repeated CommentNode children = 2;
+    int32 total_comments = 3;
+}
+
+// CommentNode - узел дерева комментариев
+message CommentNode {
+    Item item = 1;
+    repeated CommentNode children = 2;
+    int32 depth = 3;
+}
+
+// CacheInvalidationMessage - сообщение об инвалидации кэша
+message CacheInvalidationMessage {
+    string cache_key = 1;
+    string reason = 2;
+    int64 timestamp = 3;
+}
+
+// HealthCheckRequest - запрос проверки здоровья сервиса
+message HealthCheckRequest {
+    string service_name = 1;
+}
+
+// HealthCheckResponse - ответ о здоровье сервиса
+message HealthCheckResponse {
+    bool healthy = 1;
+    string status = 2;
+    int64 timestamp = 3;
+    repeated string components = 4;
+}
+
+// Service - основной контракт сервиса
+service HackerNewsService {
+    // Получение списка статей
+    rpc GetItemList(ItemListRequest) returns (ItemListResponse);
+    
+    // Получение дерева комментариев
+    rpc GetCommentTree(CommentTreeRequest) returns (CommentTreeResponse);
+    
+    // Синхронизация данных
+    rpc SyncItems(SyncRequest) returns (SyncResponse);
+    
+    // Проверка здоровья
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
